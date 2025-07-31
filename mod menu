@@ -1,0 +1,221 @@
+-- // ESP Educacional - Roblox Lua (LocalScript)
+-- // Criado por ChatGPT para aprendizado
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- GUI
+local screenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+screenGui.Name = "ESP_GUI"
+screenGui.ResetOnSpawn = false
+
+-- Abrir/fechar com tecla "P"
+local menuVisible = true
+UserInputService = game:GetService("UserInputService")
+UserInputService.InputBegan:Connect(function(input)
+	if input.KeyCode == Enum.KeyCode.P then
+		menuVisible = not menuVisible
+		screenGui.Enabled = menuVisible
+	end
+end)
+
+-- Menu moderno
+local frame = Instance.new("Frame", screenGui)
+frame.Position = UDim2.new(0, 20, 0.2, 0)
+frame.Size = UDim2.new(0, 250, 0, 350)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.BorderSizePixel = 0
+frame.Visible = true
+
+local uilist = Instance.new("UIListLayout", frame)
+uilist.Padding = UDim.new(0, 8)
+uilist.FillDirection = Enum.FillDirection.Vertical
+uilist.HorizontalAlignment = Enum.HorizontalAlignment.Left
+uilist.SortOrder = Enum.SortOrder.LayoutOrder
+
+local function createCheck(name)
+	local check = Instance.new("TextButton")
+	check.Text = "☐ " .. name
+	check.TextColor3 = Color3.new(1, 1, 1)
+	check.BackgroundTransparency = 1
+	check.TextXAlignment = Enum.TextXAlignment.Left
+	check.Size = UDim2.new(1, -10, 0, 30)
+	check.Font = Enum.Font.SourceSansBold
+	check.TextSize = 20
+	check.Name = name
+
+	local state = false
+	check.MouseButton1Click:Connect(function()
+		state = not state
+		check.Text = (state and "☑ " or "☐ ") .. name
+	end)
+
+	return check, function() return state end
+end
+
+local checks = {}
+local function addCheck(name)
+	local check, getState = createCheck(name)
+	check.Parent = frame
+	checks[name] = getState
+end
+
+-- Adiciona opções
+addCheck("Mostrar Nome")
+addCheck("Mostrar Caixa")
+addCheck("Mostrar Vida")
+addCheck("Mostrar Distância")
+addCheck("Nome do Time")
+addCheck("Check Team")
+addCheck("Tracers")
+addCheck("Cor por Time")
+
+-- ESP Loop
+local drawings = {}
+
+local function createESP(player)
+	if player == LocalPlayer then return end
+	local box = Drawing.new("Square")
+	box.Thickness = 1
+	box.Filled = false
+
+	local nameText = Drawing.new("Text")
+	nameText.Size = 13
+	nameText.Center = true
+	nameText.Outline = true
+
+	local hpBar = Drawing.new("Line")
+	hpBar.Thickness = 2
+
+	local distText = Drawing.new("Text")
+	distText.Size = 12
+	distText.Center = true
+	distText.Outline = true
+
+	local teamText = Drawing.new("Text")
+	teamText.Size = 12
+	teamText.Center = true
+	teamText.Outline = true
+
+	local tracer = Drawing.new("Line")
+	tracer.Thickness = 1
+
+	drawings[player] = {Box = box, Name = nameText, HP = hpBar, Dist = distText, Team = teamText, Tracer = tracer}
+end
+
+local function removeESP(player)
+	if drawings[player] then
+		for _, draw in pairs(drawings[player]) do
+			draw:Remove()
+		end
+		drawings[player] = nil
+	end
+end
+
+Players.PlayerRemoving:Connect(removeESP)
+
+for _, p in pairs(Players:GetPlayers()) do
+	createESP(p)
+end
+Players.PlayerAdded:Connect(createESP)
+
+RunService.RenderStepped:Connect(function()
+	for player, esp in pairs(drawings) do
+		local char = player.Character
+		local hrp = char and char:FindFirstChild("HumanoidRootPart")
+		local hum = char and char:FindFirstChild("Humanoid")
+
+		if not char or not hrp or not hum or hum.Health <= 0 then
+			for _, d in pairs(esp) do
+				d.Visible = false
+			end
+			continue
+		end
+
+		local pos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(hrp.Position)
+		if not onScreen then
+			for _, d in pairs(esp) do
+				d.Visible = false
+			end
+			continue
+		end
+
+		-- Check Team
+		if checks["Check Team"]() and player.Team == LocalPlayer.Team then
+			for _, d in pairs(esp) do
+				d.Visible = false
+			end
+			continue
+		end
+
+		local color = Color3.new(1, 1, 1)
+		if checks["Cor por Time"]() then
+			color = player.TeamColor.Color
+		end
+
+		local scale = (1 / (workspace.CurrentCamera.CFrame.Position - hrp.Position).Magnitude) * 100
+
+		-- Caixa
+		if checks["Mostrar Caixa"]() then
+			esp.Box.Visible = true
+			esp.Box.Color = color
+			esp.Box.Size = Vector2.new(40 * scale, 60 * scale)
+			esp.Box.Position = Vector2.new(pos.X - esp.Box.Size.X / 2, pos.Y - esp.Box.Size.Y / 2)
+		else
+			esp.Box.Visible = false
+		end
+
+		-- Nome
+		if checks["Mostrar Nome"]() then
+			esp.Name.Visible = true
+			esp.Name.Text = player.Name
+			esp.Name.Position = Vector2.new(pos.X, pos.Y - 40 * scale)
+			esp.Name.Color = color
+		else
+			esp.Name.Visible = false
+		end
+
+		-- Vida
+		if checks["Mostrar Vida"]() then
+			esp.HP.Visible = true
+			local healthPercent = hum.Health / hum.MaxHealth
+			esp.HP.Color = Color3.fromRGB(0, 255, 0)
+			esp.HP.From = Vector2.new(pos.X - 25 * scale, pos.Y + 30 * scale)
+			esp.HP.To = Vector2.new(pos.X - 25 * scale, pos.Y + 30 * scale - 40 * scale * healthPercent)
+		else
+			esp.HP.Visible = false
+		end
+
+		-- Distância
+		if checks["Mostrar Distância"]() then
+			local dist = math.floor((hrp.Position - workspace.CurrentCamera.CFrame.Position).Magnitude)
+			esp.Dist.Visible = true
+			esp.Dist.Text = tostring(dist) .. "m"
+			esp.Dist.Position = Vector2.new(pos.X, pos.Y + 40 * scale)
+			esp.Dist.Color = color
+		else
+			esp.Dist.Visible = false
+		end
+
+		-- Nome do time
+		if checks["Nome do Time"]() then
+			esp.Team.Visible = true
+			esp.Team.Text = tostring(player.Team)
+			esp.Team.Position = Vector2.new(pos.X, pos.Y + 55 * scale)
+			esp.Team.Color = color
+		else
+			esp.Team.Visible = false
+		end
+
+		-- Tracer
+		if checks["Tracers"]() then
+			esp.Tracer.Visible = true
+			esp.Tracer.Color = color
+			esp.Tracer.From = Vector2.new(workspace.CurrentCamera.ViewportSize.X / 2, workspace.CurrentCamera.ViewportSize.Y)
+			esp.Tracer.To = Vector2.new(pos.X, pos.Y)
+		else
+			esp.Tracer.Visible = false
+		end
+	end
+end)
