@@ -1,205 +1,572 @@
---[[
-	ESP GUI Profissional com Abas (Tabs) e Tema Escuro/Claro
-	Compatível com PC (tecla P) e Mobile (botões na tela)
-	Inclui: Box, Nome, Time, Distância, Vida, Tracers, Skeleton, Cores por Time
-]]--
-
+-- Serviços
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- GUI Principal
-local screenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-screenGui.Name = "ESP_GUI"
-screenGui.ResetOnSpawn = false
+-- GUI
+local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+ScreenGui.Name = "ESP_Aimlock_GUI"
+ScreenGui.ResetOnSpawn = false
 
--- Tema
-local isDarkMode = true
-local function getTheme()
-	return isDarkMode and Color3.fromRGB(35,35,35) or Color3.fromRGB(245,245,245)
-end
-local function getTextColor()
-	return isDarkMode and Color3.fromRGB(220,220,220) or Color3.fromRGB(30,30,30)
+-- Tema (Dark por padrão)
+local themes = {
+    Dark = {
+        Background = Color3.fromRGB(30, 30, 30),
+        Button = Color3.fromRGB(50, 50, 50),
+        Text = Color3.new(1,1,1),
+        ToggleOn = Color3.fromRGB(100, 220, 100),
+        ToggleOff = Color3.fromRGB(150, 150, 150)
+    },
+    Light = {
+        Background = Color3.fromRGB(230, 230, 230),
+        Button = Color3.fromRGB(200, 200, 200),
+        Text = Color3.new(0,0,0),
+        ToggleOn = Color3.fromRGB(100, 180, 100),
+        ToggleOff = Color3.fromRGB(120, 120, 120)
+    }
+}
+local currentTheme = "Dark"
+
+-- Função para aplicar tema em um frame/button
+local function applyTheme(obj)
+    local t = themes[currentTheme]
+    if obj:IsA("Frame") then
+        obj.BackgroundColor3 = t.Background
+    elseif obj:IsA("TextButton") then
+        obj.BackgroundColor3 = t.Button
+        obj.TextColor3 = t.Text
+    elseif obj:IsA("TextLabel") then
+        obj.TextColor3 = t.Text
+    end
 end
 
--- Frame Principal
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 300, 0, 350)
-mainFrame.Position = UDim2.new(0, 10, 0, 80)
-mainFrame.BackgroundColor3 = getTheme()
-mainFrame.BorderSizePixel = 0
-mainFrame.Visible = true
+-- Main Frame
+local mainFrame = Instance.new("Frame", ScreenGui)
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 420, 0, 350)
+mainFrame.Position = UDim2.new(0.5, -210, 0.5, -175)
+mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 mainFrame.Active = true
 mainFrame.Draggable = true
-mainFrame.Parent = screenGui
+applyTheme(mainFrame)
+local uicorner = Instance.new("UICorner", mainFrame)
+uicorner.CornerRadius = UDim.new(0, 12)
 
--- UICorner para visual moderno
-local corner = Instance.new("UICorner", mainFrame)
-corner.CornerRadius = UDim.new(0, 8)
-
--- Título
-local title = Instance.new("TextLabel")
-title.Text = "ESP Menu"
-title.Size = UDim2.new(1, 0, 0, 30)
-title.BackgroundTransparency = 1
-title.TextColor3 = getTextColor()
-title.Font = Enum.Font.GothamBold
-title.TextSize = 20
-title.Parent = mainFrame
-
--- Abas (Tabs)
-local tabs = {"Geral", "Visual", "Tema"}
-local currentTab = "Geral"
-
+-- Tabs
+local tabNames = {"ESP", "Aimlock", "Config"}
 local tabButtons = {}
-for i, tabName in ipairs(tabs) do
-	local tab = Instance.new("TextButton")
-	tab.Size = UDim2.new(0, 90, 0, 25)
-	tab.Position = UDim2.new(0, 10 + ((i-1)*100), 0, 35)
-	tab.Text = tabName
-	tab.TextColor3 = getTextColor()
-	tab.BackgroundColor3 = getTheme()
-	tab.Font = Enum.Font.Gotham
-	tab.TextSize = 14
-	tab.Parent = mainFrame
-	tab.MouseButton1Click:Connect(function()
-		currentTab = tabName
-		updateTabVisibility()
-	end)
-	table.insert(tabButtons, tab)
+local tabFrames = {}
+
+local tabButtonsFrame = Instance.new("Frame", mainFrame)
+tabButtonsFrame.Size = UDim2.new(1, 0, 0, 40)
+tabButtonsFrame.Position = UDim2.new(0,0,0,0)
+applyTheme(tabButtonsFrame)
+local uicornerTabs = Instance.new("UICorner", tabButtonsFrame)
+uicornerTabs.CornerRadius = UDim.new(0,12)
+
+local contentFrame = Instance.new("Frame", mainFrame)
+contentFrame.Size = UDim2.new(1, 0, 1, -40)
+contentFrame.Position = UDim2.new(0,0,0,40)
+applyTheme(contentFrame)
+local uicornerContent = Instance.new("UICorner", contentFrame)
+uicornerContent.CornerRadius = UDim.new(0,12)
+
+-- Criar abas e botões
+for i, name in ipairs(tabNames) do
+    -- Botão
+    local btn = Instance.new("TextButton", tabButtonsFrame)
+    btn.Size = UDim2.new(0, 140, 1, 0)
+    btn.Position = UDim2.new(0, (i-1)*140, 0, 0)
+    btn.Text = name
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 18
+    btn.BackgroundTransparency = 0
+    applyTheme(btn)
+    local corner = Instance.new("UICorner", btn)
+    corner.CornerRadius = UDim.new(0, 10)
+    tabButtons[name] = btn
+
+    -- Conteúdo da aba
+    local tabFrame = Instance.new("Frame", contentFrame)
+    tabFrame.Size = UDim2.new(1,0,1,0)
+    tabFrame.Position = UDim2.new(0,0,0,0)
+    tabFrame.Visible = false
+    applyTheme(tabFrame)
+    local cornerTab = Instance.new("UICorner", tabFrame)
+    cornerTab.CornerRadius = UDim.new(0,12)
+    tabFrames[name] = tabFrame
+
+    -- Botão alterna abas
+    btn.MouseButton1Click:Connect(function()
+        for _, f in pairs(tabFrames) do f.Visible = false end
+        tabFrames[name].Visible = true
+        -- Destaque botão ativo
+        for _, b in pairs(tabButtons) do
+            b.BackgroundColor3 = themes[currentTheme].Button
+        end
+        btn.BackgroundColor3 = themes[currentTheme].ToggleOn
+    end)
 end
 
--- Conteúdo por aba
-local tabContents = {}
-local function createTabContent(name)
-	local frame = Instance.new("Frame")
-	frame.Size = UDim2.new(1, -20, 1, -70)
-	frame.Position = UDim2.new(0, 10, 0, 65)
-	frame.BackgroundTransparency = 1
-	frame.Visible = false
-	frame.Parent = mainFrame
-	tabContents[name] = frame
-	return frame
+-- Abre aba ESP por padrão
+tabButtons["ESP"].MouseButton1Click:Wait()
+
+-- Função para criar toggle com texto e callback
+local function createToggle(parent, text, default, callback)
+    local btn = Instance.new("TextButton", parent)
+    btn.Size = UDim2.new(0, 200, 0, 35)
+    btn.Position = UDim2.new(0, 10, 0, (#parent:GetChildren()-1)*40 + 10)
+    btn.Font = Enum.Font.SourceSansSemibold
+    btn.TextSize = 16
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+    btn.BackgroundTransparency = 0
+    applyTheme(btn)
+    local corner = Instance.new("UICorner", btn)
+    corner.CornerRadius = UDim.new(0, 8)
+
+    local state = default
+    local function updateText()
+        local tColor = state and themes[currentTheme].ToggleOn or themes[currentTheme].ToggleOff
+        btn.Text = (state and "☑ " or "☐ ") .. text
+        btn.TextColor3 = tColor
+    end
+    updateText()
+
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        updateText()
+        callback(state)
+    end)
+    return btn
 end
 
--- Abas: Geral
-local generalFrame = createTabContent("Geral")
-local options = {
-	{"Box ESP", "box"},
-	{"Nome do Jogador", "name"},
-	{"Time", "team"},
-	{"Distância", "distance"},
-	{"Vida", "health"},
-	{"Tracers", "tracers"},
-	{"Skeleton", "skeleton"},
-	{"Cor por Time", "teamColor"},
+-- Variáveis ESP
+local ESP = {
+    Enabled = false,
+    ShowName = false,
+    ShowBox = false,
+    ShowHealth = false,
+    ShowDistance = false,
+    ShowTracer = false,
+    ShowSkeleton = false,
+    TeamCheck = false,
+    TeamColor = true,
+    ShowTeamName = false,
 }
 
-local states = {}
-for i, opt in ipairs(options) do
-	local label = Instance.new("TextLabel")
-	label.Text = opt[1]
-	label.Size = UDim2.new(0, 180, 0, 20)
-	label.Position = UDim2.new(0, 0, 0, (i-1)*25)
-	label.TextColor3 = getTextColor()
-	label.BackgroundTransparency = 1
-	label.TextXAlignment = Enum.TextXAlignment.Left
-	label.Font = Enum.Font.Gotham
-	label.TextSize = 14
-	label.Parent = generalFrame
+-- Variáveis Aimlock
+local Aimlock = {
+    Enabled = false,
+    SilentAim = false,
+    WallCheck = true,
+    FOV = 80,
+    AimPart = "Head",
+    BindKey = Enum.KeyCode.T,
+}
 
-	local toggle = Instance.new("TextButton")
-	toggle.Size = UDim2.new(0, 50, 0, 20)
-	toggle.Position = UDim2.new(1, -60, 0, (i-1)*25)
-	toggle.Text = "Off"
-	toggle.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
-	toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-	toggle.Font = Enum.Font.Gotham
-	toggle.TextSize = 14
-	toggle.Parent = generalFrame
+-- Toggle ESP tab
+local espTab = tabFrames["ESP"]
+createToggle(espTab, "Ativar ESP", false, function(v) ESP.Enabled = v end)
+createToggle(espTab, "Mostrar Nome", false, function(v) ESP.ShowName = v end)
+createToggle(espTab, "Mostrar Caixa", false, function(v) ESP.ShowBox = v end)
+createToggle(espTab, "Mostrar Vida", false, function(v) ESP.ShowHealth = v end)
+createToggle(espTab, "Mostrar Distância", false, function(v) ESP.ShowDistance = v end)
+createToggle(espTab, "Mostrar Tracer", false, function(v) ESP.ShowTracer = v end)
+createToggle(espTab, "Mostrar Esqueleto", false, function(v) ESP.ShowSkeleton = v end)
+createToggle(espTab, "Verificar Time", false, function(v) ESP.TeamCheck = v end)
+createToggle(espTab, "Cor por Time", true, function(v) ESP.TeamColor = v end)
+createToggle(espTab, "Mostrar Nome do Time", false, function(v) ESP.ShowTeamName = v end)
 
-	states[opt[2]] = false
-	toggle.MouseButton1Click:Connect(function()
-		states[opt[2]] = not states[opt[2]]
-		toggle.Text = states[opt[2]] and "On" or "Off"
-		toggle.BackgroundColor3 = states[opt[2]] and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(150, 50, 50)
-	end)
+-- Toggle Aimlock tab
+local aimTab = tabFrames["Aimlock"]
+createToggle(aimTab, "Ativar Aimlock", false, function(v) Aimlock.Enabled = v end)
+createToggle(aimTab, "Silent Aim", false, function(v) Aimlock.SilentAim = v end)
+createToggle(aimTab, "Wall Check", true, function(v) Aimlock.WallCheck = v end)
+
+-- FOV slider
+local fovLabel = Instance.new("TextLabel", aimTab)
+fovLabel.Text = "FOV: 80"
+fovLabel.Position = UDim2.new(0, 10, 0, 380)
+fovLabel.Size = UDim2.new(0, 200, 0, 25)
+fovLabel.BackgroundTransparency = 1
+fovLabel.Font = Enum.Font.SourceSans
+fovLabel.TextSize = 16
+fovLabel.TextColor3 = themes[currentTheme].Text
+
+local fovSlider = Instance.new("Frame", aimTab)
+fovSlider.Size = UDim2.new(0, 200, 0, 20)
+fovSlider.Position = UDim2.new(0, 10, 0, 410)
+applyTheme(fovSlider)
+local sliderCorner = Instance.new("UICorner", fovSlider)
+sliderCorner.CornerRadius = UDim.new(0, 8)
+
+local sliderFill = Instance.new("Frame", fovSlider)
+sliderFill.Size = UDim2.new(Aimlock.FOV/180, 0, 1, 0)
+sliderFill.BackgroundColor3 = themes[currentTheme].ToggleOn
+local sliderCornerFill = Instance.new("UICorner", sliderFill)
+sliderCornerFill.CornerRadius = UDim.new(0, 8)
+
+local dragging = false
+sliderFill.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+    end
+end)
+sliderFill.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local relativeX = math.clamp(input.Position.X - fovSlider.AbsolutePosition.X, 0, fovSlider.AbsoluteSize.X)
+        local perc = relativeX / fovSlider.AbsoluteSize.X
+        Aimlock.FOV = math.floor(perc * 180)
+        sliderFill.Size = UDim2.new(perc, 0, 1, 0)
+        fovLabel.Text = "FOV: " .. Aimlock.FOV
+    end
+end)
+
+-- Part chooser dropdown (Head, Torso, HumanoidRootPart)
+local parts = {"Head", "UpperTorso", "HumanoidRootPart", "LowerTorso"}
+local partLabel = Instance.new("TextLabel", aimTab)
+partLabel.Text = "Parte para Aimlock:"
+partLabel.Position = UDim2.new(0, 10, 0, 350)
+partLabel.Size = UDim2.new(0, 150, 0, 25)
+partLabel.BackgroundTransparency = 1
+partLabel.Font = Enum.Font.SourceSans
+partLabel.TextSize = 16
+partLabel.TextColor3 = themes[currentTheme].Text
+
+local partDropdown = Instance.new("TextButton", aimTab)
+partDropdown.Text = Aimlock.AimPart
+partDropdown.Size = UDim2.new(0, 150, 0, 30)
+partDropdown.Position = UDim2.new(0, 160, 0, 350)
+applyTheme(partDropdown)
+local cornerDrop = Instance.new("UICorner", partDropdown)
+cornerDrop.CornerRadius = UDim.new(0, 8)
+
+local dropdownOpen = false
+local dropdownFrame = Instance.new("Frame", aimTab)
+dropdownFrame.Size = UDim2.new(0, 150, 0, 0)
+dropdownFrame.Position = UDim2.new(0, 160, 0, 380)
+applyTheme(dropdownFrame)
+dropdownFrame.ClipsDescendants = true
+local cornerDropFrame = Instance.new("UICorner", dropdownFrame)
+cornerDropFrame.CornerRadius = UDim.new(0, 8)
+
+partDropdown.MouseButton1Click:Connect(function()
+    dropdownOpen = not dropdownOpen
+    if dropdownOpen then
+        dropdownFrame:TweenSize(UDim2.new(0,150,0,#parts*30), "Out", "Quad", 0.3, true)
+    else
+        dropdownFrame:TweenSize(UDim2.new(0,150,0,0), "Out", "Quad", 0.3, true)
+    end
+end)
+
+for i, partName in ipairs(parts) do
+    local btn = Instance.new("TextButton", dropdownFrame)
+    btn.Size = UDim2.new(1, 0, 0, 30)
+    btn.Position = UDim2.new(0, 0, 0, (i-1)*30)
+    btn.Text = partName
+    btn.Font = Enum.Font.SourceSans
+    btn.TextSize = 16
+    btn.BackgroundTransparency = 1
+    btn.TextColor3 = themes[currentTheme].Text
+
+    btn.MouseButton1Click:Connect(function()
+        Aimlock.AimPart = partName
+        partDropdown.Text = partName
+        dropdownOpen = false
+        dropdownFrame:TweenSize(UDim2.new(0,150,0,0), "Out", "Quad", 0.3, true)
+    end)
 end
 
--- Aba: Tema
-local themeFrame = createTabContent("Tema")
-local themeLabel = Instance.new("TextLabel")
-themeLabel.Text = "Tema Escuro/Claro"
-themeLabel.Size = UDim2.new(0.8, 0, 0, 25)
-themeLabel.Position = UDim2.new(0, 0, 0, 0)
-themeLabel.TextColor3 = getTextColor()
-themeLabel.Font = Enum.Font.Gotham
+-- Bind Key toggle label
+local bindLabel = Instance.new("TextLabel", aimTab)
+bindLabel.Text = "Bind para Aimlock: T"
+bindLabel.Position = UDim2.new(0, 10, 0, 440)
+bindLabel.Size = UDim2.new(0, 200, 0, 30)
+bindLabel.BackgroundTransparency = 1
+bindLabel.Font = Enum.Font.SourceSans
+bindLabel.TextSize = 16
+bindLabel.TextColor3 = themes[currentTheme].Text
 
-themeLabel.TextSize = 14
-themeLabel.BackgroundTransparency = 1
-themeLabel.TextXAlignment = Enum.TextXAlignment.Left
-themeLabel.Parent = themeFrame
-
-local themeToggle = Instance.new("TextButton")
-themeToggle.Size = UDim2.new(0, 50, 0, 20)
-themeToggle.Position = UDim2.new(1, -60, 0, 0)
-themeToggle.Text = isDarkMode and "Dark" or "Light"
-themeToggle.BackgroundColor3 = Color3.fromRGB(90, 90, 90)
-themeToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-themeToggle.Font = Enum.Font.Gotham
-
-themeToggle.TextSize = 14
-themeToggle.Parent = themeFrame
-
-themeToggle.MouseButton1Click:Connect(function()
-	isDarkMode = not isDarkMode
-	themeToggle.Text = isDarkMode and "Dark" or "Light"
-	mainFrame.BackgroundColor3 = getTheme()
-	title.TextColor3 = getTextColor()
-	for _, b in pairs(tabButtons) do b.BackgroundColor3 = getTheme(); b.TextColor3 = getTextColor() end
-	for _, f in pairs(tabContents) do
-		for _, c in pairs(f:GetChildren()) do
-			if c:IsA("TextLabel") or c:IsA("TextButton") then
-				c.TextColor3 = getTextColor()
-			end
-		end
-	end
+-- Aimlock toggle key state
+local aimlockActive = false
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed then
+        if input.KeyCode == Aimlock.BindKey then
+            aimlockActive = not aimlockActive
+        end
+    end
 end)
 
--- Função de atualização das abas
-function updateTabVisibility()
-	for name, frame in pairs(tabContents) do
-		frame.Visible = name == currentTab
-	end
+-- Função raycast para wall check
+local function canSee(targetPos)
+    local origin = Camera.CFrame.Position
+    local direction = (targetPos - origin).Unit * (targetPos - origin).Magnitude
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    local result = workspace:Raycast(origin, direction, raycastParams)
+    if result then
+        return (result.Instance:IsDescendantOf(targetPos.Parent))
+    else
+        return true
+    end
 end
-updateTabVisibility()
 
--- Tecla para esconder/mostrar
-local menuVisible = true
-UserInputService.InputBegan:Connect(function(input, gpe)
-	if not gpe and input.KeyCode == Enum.KeyCode.P then
-		menuVisible = not menuVisible
-		mainFrame.Visible = menuVisible
-	end
+-- Função para achar o melhor alvo baseado na distância do centro da tela e FOV
+local function getClosestTarget()
+    local closest, shortestDist = nil, Aimlock.FOV
+    local screenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild(Aimlock.AimPart) then
+            if ESP.TeamCheck and player.Team == LocalPlayer.Team then continue end
+            local part = player.Character[Aimlock.AimPart]
+            local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+            if onScreen then
+                local distance = (Vector2.new(pos.X, pos.Y) - screenCenter).Magnitude
+                if distance < shortestDist then
+                    if Aimlock.WallCheck and not canSee(part) then
+                        -- Ignora se não vê
+                    else
+                        closest = part
+                        shortestDist = distance
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- Aimlock ativação
+RunService.RenderStepped:Connect(function()
+    if Aimlock.Enabled and aimlockActive and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local targetPart = getClosestTarget()
+        if targetPart then
+            if Aimlock.SilentAim then
+                -- Silent aim: Aqui você precisa integrar com o sistema de tiro, exemplo:
+                -- Modifique o mouse target para targetPart.Position
+                -- Como isso depende do jogo, deixo placeholder para implementação
+            else
+                -- Move a câmera suavemente para o alvo
+                local camCFrame = Camera.CFrame
+                local targetPos = targetPart.Position
+                local direction = (targetPos - camCFrame.Position).Unit
+                local newCFrame = CFrame.new(camCFrame.Position, camCFrame.Position + direction)
+                Camera.CFrame = newCFrame
+            end
+        end
+    end
 end)
 
--- Botão para mobile
-local mobileButton = Instance.new("TextButton")
-mobileButton.Size = UDim2.new(0, 100, 0, 30)
-mobileButton.Position = UDim2.new(0, 10, 0, 20)
-mobileButton.Text = "Toggle Menu"
-mobileButton.Parent = screenGui
-mobileButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-mobileButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+-- ESP Drawing Cache (reuso para performance)
+local drawingCache = {}
 
-mobileButton.MouseButton1Click:Connect(function()
-	menuVisible = not menuVisible
-	mainFrame.Visible = menuVisible
+local function createOrGetDrawing(player, key, typeName)
+    if not drawingCache[player] then drawingCache[player] = {} end
+    if not drawingCache[player][key] then
+        local d = Drawing.new(typeName)
+        drawingCache[player][key] = d
+    end
+    return drawingCache[player][key]
+end
+
+local function clearDrawingCache()
+    for _, data in pairs(drawingCache) do
+        for _, d in pairs(data) do
+            d.Visible = false
+        end
+    end
+end
+
+-- Skeleton points connections (example bones)
+local skeletonBones = {
+    {"Head", "UpperTorso"},
+    {"UpperTorso", "LowerTorso"},
+    {"LowerTorso", "LeftUpperArm"},
+    {"LeftUpperArm", "LeftLowerArm"},
+    {"LeftLowerArm", "LeftHand"},
+    {"UpperTorso", "RightUpperArm"},
+    {"RightUpperArm", "RightLowerArm"},
+    {"RightLowerArm", "RightHand"},
+    {"LowerTorso", "LeftUpperLeg"},
+    {"LeftUpperLeg", "LeftLowerLeg"},
+    {"LeftLowerLeg", "LeftFoot"},
+    {"LowerTorso", "RightUpperLeg"},
+    {"RightUpperLeg", "RightLowerLeg"},
+    {"RightLowerLeg", "RightFoot"},
+}
+
+RunService.RenderStepped:Connect(function()
+    clearDrawingCache()
+    if not ESP.Enabled then return end
+    local camPos = Camera.CFrame.Position
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            if ESP.TeamCheck and player.Team == LocalPlayer.Team then continue end
+
+            local hrp = player.Character.HumanoidRootPart
+            local hum = player.Character:FindFirstChildOfClass("Humanoid")
+            if not hum or hum.Health <= 0 then continue end
+
+            local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+            if not onScreen then continue end
+
+            local color = ESP.TeamColor and player.TeamColor.Color or Color3.new(1,1,1)
+            local scale = math.clamp(1000 / (hrp.Position - camPos).Magnitude, 0.5, 2)
+
+            -- Box
+            if ESP.ShowBox then
+                local box = createOrGetDrawing(player, "Box", "Square")
+                box.Visible = true
+                box.Color = color
+                box.Thickness = 2
+                box.Filled = false
+                box.Size = Vector2.new(40 * scale, 60 * scale)
+                box.Position = Vector2.new(pos.X - box.Size.X/2, pos.Y - box.Size.Y/2)
+            end
+
+            -- Name
+            if ESP.ShowName then
+                local nameText = createOrGetDrawing(player, "Name", "Text")
+                nameText.Visible = true
+                nameText.Text = player.Name
+                nameText.Size = 15
+                nameText.Color = color
+                nameText.Center = true
+                nameText.Outline = true
+                nameText.Position = Vector2.new(pos.X, pos.Y - 40 * scale)
+            end
+
+            -- Health bar (vertical line)
+            if ESP.ShowHealth then
+                local healthBar = createOrGetDrawing(player, "Health", "Line")
+                healthBar.Visible = true
+                healthBar.Thickness = 3
+                healthBar.Color = Color3.fromRGB(0, 255, 0)
+                local healthPercent = hum.Health / hum.MaxHealth
+                local barHeight = 50 * scale
+                local x = pos.X - 25 * scale
+                local y1 = pos.Y + barHeight/2
+                local y2 = y1 - barHeight * healthPercent
+                healthBar.From = Vector2.new(x, y1)
+                healthBar.To = Vector2.new(x, y2)
+            end
+
+            -- Distance
+            if ESP.ShowDistance then
+                local distText = createOrGetDrawing(player, "Distance", "Text")
+                distText.Visible = true
+                local dist = math.floor((hrp.Position - camPos).Magnitude)
+                distText.Text = dist .. "m"
+                distText.Size = 14
+                distText.Color = color
+                distText.Center = true
+                distText.Outline = true
+                distText.Position = Vector2.new(pos.X, pos.Y + 40 * scale)
+            end
+
+            -- Team Name
+            if ESP.ShowTeamName then
+                local teamText = createOrGetDrawing(player, "TeamName", "Text")
+                teamText.Visible = true
+                teamText.Text = tostring(player.Team)
+                teamText.Size = 14
+                teamText.Color = color
+                teamText.Center = true
+                teamText.Outline = true
+                teamText.Position = Vector2.new(pos.X, pos.Y + 55 * scale)
+            end
+
+            -- Tracers
+            if ESP.ShowTracer then
+                local tracer = createOrGetDrawing(player, "Tracer", "Line")
+                tracer.Visible = true
+                tracer.Color = color
+                tracer.Thickness = 1
+                tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                tracer.To = Vector2.new(pos.X, pos.Y)
+            end
+
+            -- Skeleton
+            if ESP.ShowSkeleton then
+                for _, bone in ipairs(skeletonBones) do
+                    local part0 = player.Character:FindFirstChild(bone[1])
+                    local part1 = player.Character:FindFirstChild(bone[2])
+                    if part0 and part1 then
+                        local p0, on0 = Camera:WorldToViewportPoint(part0.Position)
+                        local p1, on1 = Camera:WorldToViewportPoint(part1.Position)
+                        if on0 and on1 then
+                            local line = createOrGetDrawing(player, "Skeleton_"..bone[1].."_"..bone[2], "Line")
+                            line.Visible = true
+                            line.Color = color
+                            line.Thickness = 2
+                            line.From = Vector2.new(p0.X, p0.Y)
+                            line.To = Vector2.new(p1.X, p1.Y)
+                        end
+                    end
+                end
+            end
+        end
+    end
 end)
 
--- Seu sistema de renderização de ESP deve usar as variáveis em 'states'
--- Exemplo:
--- if states["box"] then desenharBox() end
--- if states["tracers"] then desenharLinha() end
+-- Config Tab
+local configTab = tabFrames["Config"]
+local themeToggle = createToggle(configTab, "Tema Claro", false, function(v)
+    currentTheme = v and "Light" or "Dark"
+    applyTheme(mainFrame)
+    applyTheme(tabButtonsFrame)
+    applyTheme(contentFrame)
+    for _, btn in pairs(tabButtons) do
+        applyTheme(btn)
+    end
+    for _, tab in pairs(tabFrames) do
+        applyTheme(tab)
+        for _, child in pairs(tab:GetChildren()) do
+            if child:IsA("TextButton") or child:IsA("TextLabel") or child:IsA("Frame") then
+                applyTheme(child)
+            end
+        end
+    end
+    -- Atualizar slider e dropdown também
+    sliderFill.BackgroundColor3 = themes[currentTheme].ToggleOn
+    fovLabel.TextColor3 = themes[currentTheme].Text
+    partLabel.TextColor3 = themes[currentTheme].Text
+    bindLabel.TextColor3 = themes[currentTheme].Text
+end)
+
+-- Toggle GUI com tecla P
+local guiVisible = true
+UserInputService.InputBegan:Connect(function(input, gp)
+    if not gp then
+        if input.KeyCode == Enum.KeyCode.P then
+            guiVisible = not guiVisible
+            ScreenGui.Enabled = guiVisible
+        end
+    end
+end)
+
+-- Botão toggle para mobile
+local mobileToggle = Instance.new("TextButton", ScreenGui)
+mobileToggle.Size = UDim2.new(0, 120, 0, 40)
+mobileToggle.Position = UDim2.new(1, -130, 1, -60)
+mobileToggle.Text = "Toggle GUI"
+mobileToggle.Font = Enum.Font.SourceSansBold
+mobileToggle.TextSize = 16
+mobileToggle.BackgroundTransparency = 0
+applyTheme(mobileToggle)
+mobileToggle.Visible = UserInputService.TouchEnabled
+local mobileCorner = Instance.new("UICorner", mobileToggle)
+mobileCorner.CornerRadius = UDim.new(0, 10)
+mobileToggle.MouseButton1Click:Connect(function()
+    guiVisible = not guiVisible
+    ScreenGui.Enabled = guiVisible
+end)
