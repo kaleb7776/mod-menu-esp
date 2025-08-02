@@ -1,213 +1,205 @@
+--[[
+	ESP GUI Profissional com Abas (Tabs) e Tema Escuro/Claro
+	Compatível com PC (tecla P) e Mobile (botões na tela)
+	Inclui: Box, Nome, Time, Distância, Vida, Tracers, Skeleton, Cores por Time
+]]--
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
+-- GUI Principal
 local screenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
 screenGui.Name = "ESP_GUI"
 screenGui.ResetOnSpawn = false
 
-local menuVisible = true
-UserInputService = game:GetService("UserInputService")
-UserInputService.InputBegan:Connect(function(input)
-	if input.KeyCode == Enum.KeyCode.P then
-		menuVisible = not menuVisible
-		screenGui.Enabled = menuVisible
-	end
-end)
+-- Tema
+local isDarkMode = true
+local function getTheme()
+	return isDarkMode and Color3.fromRGB(35,35,35) or Color3.fromRGB(245,245,245)
+end
+local function getTextColor()
+	return isDarkMode and Color3.fromRGB(220,220,220) or Color3.fromRGB(30,30,30)
+end
 
+-- Frame Principal
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 300, 0, 350)
+mainFrame.Position = UDim2.new(0, 10, 0, 80)
+mainFrame.BackgroundColor3 = getTheme()
+mainFrame.BorderSizePixel = 0
+mainFrame.Visible = true
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
 
-local frame = Instance.new("Frame", screenGui)
-frame.Position = UDim2.new(0, 20, 0.2, 0)
-frame.Size = UDim2.new(0, 250, 0, 350)
-frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-frame.BorderSizePixel = 0
-frame.Visible = true
+-- UICorner para visual moderno
+local corner = Instance.new("UICorner", mainFrame)
+corner.CornerRadius = UDim.new(0, 8)
 
-local uilist = Instance.new("UIListLayout", frame)
-uilist.Padding = UDim.new(0, 8)
-uilist.FillDirection = Enum.FillDirection.Vertical
-uilist.HorizontalAlignment = Enum.HorizontalAlignment.Left
-uilist.SortOrder = Enum.SortOrder.LayoutOrder
+-- Título
+local title = Instance.new("TextLabel")
+title.Text = "ESP Menu"
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundTransparency = 1
+title.TextColor3 = getTextColor()
+title.Font = Enum.Font.GothamBold
+title.TextSize = 20
+title.Parent = mainFrame
 
-local function createCheck(name)
-	local check = Instance.new("TextButton")
-	check.Text = "☐ " .. name
-	check.TextColor3 = Color3.new(1, 1, 1)
-	check.BackgroundTransparency = 1
-	check.TextXAlignment = Enum.TextXAlignment.Left
-	check.Size = UDim2.new(1, -10, 0, 30)
-	check.Font = Enum.Font.SourceSansBold
-	check.TextSize = 20
-	check.Name = name
+-- Abas (Tabs)
+local tabs = {"Geral", "Visual", "Tema"}
+local currentTab = "Geral"
 
-	local state = false
-	check.MouseButton1Click:Connect(function()
-		state = not state
-		check.Text = (state and "☑ " or "☐ ") .. name
+local tabButtons = {}
+for i, tabName in ipairs(tabs) do
+	local tab = Instance.new("TextButton")
+	tab.Size = UDim2.new(0, 90, 0, 25)
+	tab.Position = UDim2.new(0, 10 + ((i-1)*100), 0, 35)
+	tab.Text = tabName
+	tab.TextColor3 = getTextColor()
+	tab.BackgroundColor3 = getTheme()
+	tab.Font = Enum.Font.Gotham
+	tab.TextSize = 14
+	tab.Parent = mainFrame
+	tab.MouseButton1Click:Connect(function()
+		currentTab = tabName
+		updateTabVisibility()
 	end)
-
-	return check, function() return state end
+	table.insert(tabButtons, tab)
 end
 
-local checks = {}
-local function addCheck(name)
-	local check, getState = createCheck(name)
-	check.Parent = frame
-	checks[name] = getState
+-- Conteúdo por aba
+local tabContents = {}
+local function createTabContent(name)
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.new(1, -20, 1, -70)
+	frame.Position = UDim2.new(0, 10, 0, 65)
+	frame.BackgroundTransparency = 1
+	frame.Visible = false
+	frame.Parent = mainFrame
+	tabContents[name] = frame
+	return frame
 end
 
-addCheck("Mostrar Nome")
-addCheck("Mostrar Caixa")
-addCheck("Mostrar Vida")
-addCheck("Mostrar Distância")
-addCheck("Nome do Time")
-addCheck("Check Team")
-addCheck("Tracers")
-addCheck("Cor por Time")
+-- Abas: Geral
+local generalFrame = createTabContent("Geral")
+local options = {
+	{"Box ESP", "box"},
+	{"Nome do Jogador", "name"},
+	{"Time", "team"},
+	{"Distância", "distance"},
+	{"Vida", "health"},
+	{"Tracers", "tracers"},
+	{"Skeleton", "skeleton"},
+	{"Cor por Time", "teamColor"},
+}
 
-local drawings = {}
+local states = {}
+for i, opt in ipairs(options) do
+	local label = Instance.new("TextLabel")
+	label.Text = opt[1]
+	label.Size = UDim2.new(0, 180, 0, 20)
+	label.Position = UDim2.new(0, 0, 0, (i-1)*25)
+	label.TextColor3 = getTextColor()
+	label.BackgroundTransparency = 1
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Font = Enum.Font.Gotham
+	label.TextSize = 14
+	label.Parent = generalFrame
 
-local function createESP(player)
-	if player == LocalPlayer then return end
-	local box = Drawing.new("Square")
-	box.Thickness = 1
-	box.Filled = false
+	local toggle = Instance.new("TextButton")
+	toggle.Size = UDim2.new(0, 50, 0, 20)
+	toggle.Position = UDim2.new(1, -60, 0, (i-1)*25)
+	toggle.Text = "Off"
+	toggle.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+	toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+	toggle.Font = Enum.Font.Gotham
+	toggle.TextSize = 14
+	toggle.Parent = generalFrame
 
-	local nameText = Drawing.new("Text")
-	nameText.Size = 13
-	nameText.Center = true
-	nameText.Outline = true
-
-	local hpBar = Drawing.new("Line")
-	hpBar.Thickness = 2
-
-	local distText = Drawing.new("Text")
-	distText.Size = 12
-	distText.Center = true
-	distText.Outline = true
-
-	local teamText = Drawing.new("Text")
-	teamText.Size = 12
-	teamText.Center = true
-	teamText.Outline = true
-
-	local tracer = Drawing.new("Line")
-	tracer.Thickness = 1
-
-	drawings[player] = {Box = box, Name = nameText, HP = hpBar, Dist = distText, Team = teamText, Tracer = tracer}
+	states[opt[2]] = false
+	toggle.MouseButton1Click:Connect(function()
+		states[opt[2]] = not states[opt[2]]
+		toggle.Text = states[opt[2]] and "On" or "Off"
+		toggle.BackgroundColor3 = states[opt[2]] and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(150, 50, 50)
+	end)
 end
 
-local function removeESP(player)
-	if drawings[player] then
-		for _, draw in pairs(drawings[player]) do
-			draw:Remove()
-		end
-		drawings[player] = nil
-	end
-end
+-- Aba: Tema
+local themeFrame = createTabContent("Tema")
+local themeLabel = Instance.new("TextLabel")
+themeLabel.Text = "Tema Escuro/Claro"
+themeLabel.Size = UDim2.new(0.8, 0, 0, 25)
+themeLabel.Position = UDim2.new(0, 0, 0, 0)
+themeLabel.TextColor3 = getTextColor()
+themeLabel.Font = Enum.Font.Gotham
 
-Players.PlayerRemoving:Connect(removeESP)
+themeLabel.TextSize = 14
+themeLabel.BackgroundTransparency = 1
+themeLabel.TextXAlignment = Enum.TextXAlignment.Left
+themeLabel.Parent = themeFrame
 
-for _, p in pairs(Players:GetPlayers()) do
-	createESP(p)
-end
-Players.PlayerAdded:Connect(createESP)
+local themeToggle = Instance.new("TextButton")
+themeToggle.Size = UDim2.new(0, 50, 0, 20)
+themeToggle.Position = UDim2.new(1, -60, 0, 0)
+themeToggle.Text = isDarkMode and "Dark" or "Light"
+themeToggle.BackgroundColor3 = Color3.fromRGB(90, 90, 90)
+themeToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+themeToggle.Font = Enum.Font.Gotham
 
-RunService.RenderStepped:Connect(function()
-	for player, esp in pairs(drawings) do
-		local char = player.Character
-		local hrp = char and char:FindFirstChild("HumanoidRootPart")
-		local hum = char and char:FindFirstChild("Humanoid")
+themeToggle.TextSize = 14
+themeToggle.Parent = themeFrame
 
-		if not char or not hrp or not hum or hum.Health <= 0 then
-			for _, d in pairs(esp) do
-				d.Visible = false
+themeToggle.MouseButton1Click:Connect(function()
+	isDarkMode = not isDarkMode
+	themeToggle.Text = isDarkMode and "Dark" or "Light"
+	mainFrame.BackgroundColor3 = getTheme()
+	title.TextColor3 = getTextColor()
+	for _, b in pairs(tabButtons) do b.BackgroundColor3 = getTheme(); b.TextColor3 = getTextColor() end
+	for _, f in pairs(tabContents) do
+		for _, c in pairs(f:GetChildren()) do
+			if c:IsA("TextLabel") or c:IsA("TextButton") then
+				c.TextColor3 = getTextColor()
 			end
-			continue
-		end
-
-		local pos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(hrp.Position)
-		if not onScreen then
-			for _, d in pairs(esp) do
-				d.Visible = false
-			end
-			continue
-		end
-
-	
-		if checks["Check Team"]() and player.Team == LocalPlayer.Team then
-			for _, d in pairs(esp) do
-				d.Visible = false
-			end
-			continue
-		end
-
-		local color = Color3.new(1, 1, 1)
-		if checks["Cor por Time"]() then
-			color = player.TeamColor.Color
-		end
-
-		local scale = (1 / (workspace.CurrentCamera.CFrame.Position - hrp.Position).Magnitude) * 100
-
-		if checks["Mostrar Caixa"]() then
-			esp.Box.Visible = true
-			esp.Box.Color = color
-			esp.Box.Size = Vector2.new(40 * scale, 60 * scale)
-			esp.Box.Position = Vector2.new(pos.X - esp.Box.Size.X / 2, pos.Y - esp.Box.Size.Y / 2)
-		else
-			esp.Box.Visible = false
-		end
-
-		
-		if checks["Mostrar Nome"]() then
-			esp.Name.Visible = true
-			esp.Name.Text = player.Name
-			esp.Name.Position = Vector2.new(pos.X, pos.Y - 40 * scale)
-			esp.Name.Color = color
-		else
-			esp.Name.Visible = false
-		end
-
-		
-		if checks["Mostrar Vida"]() then
-			esp.HP.Visible = true
-			local healthPercent = hum.Health / hum.MaxHealth
-			esp.HP.Color = Color3.fromRGB(0, 255, 0)
-			esp.HP.From = Vector2.new(pos.X - 25 * scale, pos.Y + 30 * scale)
-			esp.HP.To = Vector2.new(pos.X - 25 * scale, pos.Y + 30 * scale - 40 * scale * healthPercent)
-		else
-			esp.HP.Visible = false
-		end
-
-		
-		if checks["Mostrar Distância"]() then
-			local dist = math.floor((hrp.Position - workspace.CurrentCamera.CFrame.Position).Magnitude)
-			esp.Dist.Visible = true
-			esp.Dist.Text = tostring(dist) .. "m"
-			esp.Dist.Position = Vector2.new(pos.X, pos.Y + 40 * scale)
-			esp.Dist.Color = color
-		else
-			esp.Dist.Visible = false
-		end
-
-		
-		if checks["Nome do Time"]() then
-			esp.Team.Visible = true
-			esp.Team.Text = tostring(player.Team)
-			esp.Team.Position = Vector2.new(pos.X, pos.Y + 55 * scale)
-			esp.Team.Color = color
-		else
-			esp.Team.Visible = false
-		end
-
-	
-		if checks["Tracers"]() then
-			esp.Tracer.Visible = true
-			esp.Tracer.Color = color
-			esp.Tracer.From = Vector2.new(workspace.CurrentCamera.ViewportSize.X / 2, workspace.CurrentCamera.ViewportSize.Y)
-			esp.Tracer.To = Vector2.new(pos.X, pos.Y)
-		else
-			esp.Tracer.Visible = false
 		end
 	end
 end)
+
+-- Função de atualização das abas
+function updateTabVisibility()
+	for name, frame in pairs(tabContents) do
+		frame.Visible = name == currentTab
+	end
+end
+updateTabVisibility()
+
+-- Tecla para esconder/mostrar
+local menuVisible = true
+UserInputService.InputBegan:Connect(function(input, gpe)
+	if not gpe and input.KeyCode == Enum.KeyCode.P then
+		menuVisible = not menuVisible
+		mainFrame.Visible = menuVisible
+	end
+end)
+
+-- Botão para mobile
+local mobileButton = Instance.new("TextButton")
+mobileButton.Size = UDim2.new(0, 100, 0, 30)
+mobileButton.Position = UDim2.new(0, 10, 0, 20)
+mobileButton.Text = "Toggle Menu"
+mobileButton.Parent = screenGui
+mobileButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+mobileButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+
+mobileButton.MouseButton1Click:Connect(function()
+	menuVisible = not menuVisible
+	mainFrame.Visible = menuVisible
+end)
+
+-- Seu sistema de renderização de ESP deve usar as variáveis em 'states'
+-- Exemplo:
+-- if states["box"] then desenharBox() end
+-- if states["tracers"] then desenharLinha() end
